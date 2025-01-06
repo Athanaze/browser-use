@@ -10,11 +10,6 @@ from browser_use.controller.registry.views import (
 	ActionRegistry,
 	RegisteredAction,
 )
-from browser_use.telemetry.service import ProductTelemetry
-from browser_use.telemetry.views import (
-	ControllerRegisteredFunctionsTelemetryEvent,
-	RegisteredFunction,
-)
 
 
 class Registry:
@@ -22,7 +17,6 @@ class Registry:
 
 	def __init__(self):
 		self.registry = ActionRegistry()
-		self.telemetry = ProductTelemetry()
 
 	def _create_param_model(self, function: Callable) -> Type[BaseModel]:
 		"""Creates a Pydantic model from function signature"""
@@ -117,15 +111,6 @@ class Registry:
 			name: (Optional[action.param_model], None)
 			for name, action in self.registry.actions.items()
 		}
-
-		self.telemetry.capture(
-			ControllerRegisteredFunctionsTelemetryEvent(
-				registered_functions=[
-					RegisteredFunction(name=name, params=action.param_model.model_json_schema())
-					for name, action in self.registry.actions.items()
-				]
-			)
-		)
 
 		return create_model('ActionModel', __base__=ActionModel, **fields)  # type:ignore
 

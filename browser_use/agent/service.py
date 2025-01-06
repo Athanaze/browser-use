@@ -42,12 +42,6 @@ from browser_use.dom.history_tree_processor.service import (
 	DOMHistoryElement,
 	HistoryTreeProcessor,
 )
-from browser_use.telemetry.service import ProductTelemetry
-from browser_use.telemetry.views import (
-	AgentEndTelemetryEvent,
-	AgentRunTelemetryEvent,
-	AgentStepErrorTelemetryEvent,
-)
 from browser_use.utils import time_execution_async
 
 load_dotenv()
@@ -122,9 +116,6 @@ class Agent:
 
 		self.system_prompt_class = system_prompt_class
 
-		# Telemetry setup
-		self.telemetry = ProductTelemetry()
-
 		# Action and output models setup
 		self._setup_action_models()
 
@@ -195,12 +186,7 @@ class Agent:
 				return
 			for r in result:
 				if r.error:
-					self.telemetry.capture(
-						AgentStepErrorTelemetryEvent(
-							agent_id=self.agent_id,
-							error=r.error,
-						)
-					)
+					logger.error(f'❌ Result failed {self.consecutive_failures + 1}/{self.max_failures} times:\n {r.error}')
 			if state:
 				self._make_history_item(model_output, state, result)
 
@@ -331,13 +317,6 @@ class Agent:
 		try:
 			logger.info(f'🚀 Starting task: {self.task}')
 
-			self.telemetry.capture(
-				AgentRunTelemetryEvent(
-					agent_id=self.agent_id,
-					task=self.task,
-				)
-			)
-
 			for step in range(max_steps):
 				if self._too_many_failures():
 					break
@@ -359,14 +338,6 @@ class Agent:
 			return self.history
 
 		finally:
-			self.telemetry.capture(
-				AgentEndTelemetryEvent(
-					agent_id=self.agent_id,
-					task=self.task,
-					success=self.history.is_done(),
-					steps=len(self.history.history),
-				)
-			)
 			if not self.injected_browser_context:
 				await self.browser_context.close()
 
@@ -892,7 +863,7 @@ class Agent:
 			logo = Image.open(logo_path)
 			logo.thumbnail((logo_size, logo_size))
 			frame.paste(
-				logo, (width - logo_size - 20, 20), logo if 'A' in logo.getbands() else None
+				logo, (width - logo_size - 20, 20), logo if logo.mode == 'RGBA' else None
 			)
 
 		# Create drawing context
@@ -939,7 +910,7 @@ class Agent:
 			frame.paste(
 				small_logo,
 				(margin - text_padding + 10, 45),  # Positioned inside goal box
-				small_logo if 'A' in small_logo.getbands() else None,
+				small_logo if small_logo.mode == 'RGBA' else None,
 			)
 
 		# Draw text with proper wrapping
